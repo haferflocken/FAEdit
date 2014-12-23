@@ -4,76 +4,88 @@ using System.IO;
 
 public class DDSImporter
 {
-	public static void Load(GameObject gameObject, FileInfo albedoFile, FileInfo normalsTSFile, FileInfo specTeamFile)
+	public enum LoadStages
+	{
+		Init = 0,
+		Albedo = 1,
+		Normals = 2,
+		SpecTeam = 3,
+		Count = 4,
+	}
+
+	// There are many textures to load, so they are loaded in stages by a coroutine.
+	// This isn't just a coroutine itself because it would make the control flow unclear.
+	public static bool LoadStage(LoadStages stage, GameObject gameObject, LODFiles lod)
 	{
 		SkinnedMeshRenderer renderer = gameObject.GetComponent<SkinnedMeshRenderer>();
 		if (renderer == null)
 		{
 			Debug.LogError("Textures cannot be loaded onto a GameObject with no SkinnedMeshRenderer.");
-			return;
+			return false;
 		}
 
-		// Load the raw albedo.
-		Debug.Log("Loading Albedo: " + albedoFile.Name);
-		Texture2D albedo = LoadDDSFile(albedoFile);
+		switch (stage)
+		{
+		case LoadStages.Init:
+			return LoadInit(gameObject, renderer, lod);
+		case LoadStages.Albedo:
+			return LoadAlbedo(gameObject, renderer, lod);
+		case LoadStages.Normals:
+			return LoadNormals(gameObject, renderer, lod);
+		case LoadStages.SpecTeam:
+			return LoadSpecTeam(gameObject, renderer, lod);
+		}
+
+		Debug.LogError("Invalid DDSImporter load stage.");
+		return false;
+	}
+
+	private static bool LoadInit(GameObject gameObject, SkinnedMeshRenderer renderer, LODFiles lod)
+	{
+		renderer.material = ShaderNameToMaterial(lod.shaderName);
+		return true;
+	}
+
+	private static bool LoadAlbedo(GameObject gameObject, SkinnedMeshRenderer renderer, LODFiles lod)
+	{
+		Debug.Log("Loading Albedo: " + lod.albedo.Name);
+		Texture2D albedo = LoadDDSFile(lod.albedo);
 		if (albedo == null)
 		{
 			Debug.LogError("Failed to load albedo texture.");
-			return;
+			return false;
 		}
-		Debug.Log("Albedo dimensions: " + albedo.width + ", " + albedo.height);
+		renderer.material.SetTexture("_MainTex", albedo);
+		return true;
+	}
 
-		// Load the raw normals.
-		Debug.Log("Loading Normals: " + normalsTSFile.Name);
-		Texture2D normalsTS = LoadDDSFile(normalsTSFile);
+	private static bool LoadNormals(GameObject gameObject, SkinnedMeshRenderer renderer, LODFiles lod)
+	{
+		Debug.Log("Loading Normals: " + lod.normalsTS.Name);
+		Texture2D normalsTS = LoadDDSFile(lod.normalsTS);
 		if (normalsTS == null)
 		{
 			Debug.LogError("Failed to load normalsTS texture.");
-			return;
+			return false;
 		}
-		Debug.Log("NormalsTS dimensions: " + normalsTS.width + ", " + normalsTS.height);
 
-		// Load the raw specteam.
-		Debug.Log("Loading SpecTeam: " + specTeamFile.Name);
-		Texture2D specTeam = LoadDDSFile(specTeamFile);
+		renderer.material.SetTexture("_BumpMap", normalsTS);
+		renderer.material.SetFloat("_BumpWidth", normalsTS.width);
+		renderer.material.SetFloat("_BumpHeight", normalsTS.height);
+		return true;
+	}
+
+	private static bool LoadSpecTeam(GameObject gameObject, SkinnedMeshRenderer renderer, LODFiles lod)
+	{
+		Debug.Log("Loading SpecTeam: " + lod.specTeam.Name);
+		Texture2D specTeam = LoadDDSFile(lod.specTeam);
 		if (specTeam == null)
 		{
 			Debug.LogError("Failed to load specTeam texture.");
-			return;
+			return false;
 		}
-		Debug.Log("SpecTeam dimensions: " + specTeam.width + ", " + specTeam.height);
-
-		// Transform the normal map to a proper normal map.
-		Texture2D normals = GrayscaleToNormals(normalsTS, albedo.width, albedo.height);
-
-		// Copy the green channel of the specteam to the alpha channel of the albedo.
-		/*Color[] greenToAlpha = new Color[albedo.width * albedo.height];
-		float fAlbedoWidth = (float)albedo.width;
-		float fAlbedoHeight = (float)albedo.height;
-		for (int y = 0; y < albedo.height; ++y)
-		{
-			float fY = (float)y;
-			for (int x = 0; x < albedo.width; ++x)
-			{
-				float fX = (float)x;
-
-				Color pixel = albedo.GetPixel(x, y);
-				Color specTeamPixel = specTeam.GetPixelBilinear(fX / fAlbedoWidth, fY / fAlbedoHeight);
-				Color adjustedPixel = new Color(pixel.r, pixel.g, pixel.b, specTeamPixel.g);
-				greenToAlpha[x + y * albedo.width] = adjustedPixel;
-			}
-		}
-		Texture2D albedoWithSpecTeamGreen = new Texture2D(albedo.width, albedo.height, TextureFormat.ARGB32, false);
-		albedoWithSpecTeamGreen.SetPixels(greenToAlpha);
-		albedoWithSpecTeamGreen.Apply();*/
-
-		// Assign the loaded textures to a material and apply it.
-		Material material = new Material(Shader.Find("Custom/FAUnitShader"));
-		material.SetTexture("_MainTex", albedo);
-		//material.SetTexture("_BumpMap", normals); // TODO(jwerner) 
-		material.SetTexture("_SpecTeam", specTeam);
-
-		renderer.material = material;
+		renderer.material.SetTexture("_SpecTeam", specTeam);
+		return true;
 	}
 
 	private static Texture2D LoadDDSFile(FileInfo ddsFile)
@@ -123,52 +135,20 @@ public class DDSImporter
 		Texture2D texture = new Texture2D(width, height, textureFormat, false);
 		texture.LoadRawTextureData(dxtBytes);
 		texture.Apply();
+
+		Debug.Log("Loaded " + stringTextureFormat + " [" + width + ", " + height + "]");
 		
 		return texture;
 	}
 
-	// http://answers.unity3d.com/questions/723993/how-does-unity-create-normal-maps-from-grayscale.html
-	private static Texture2D GrayscaleToNormals(Texture2D bumpMap, int newWidth, int newHeight)
+	// Shader names can configure materials, so shader name specific material setup goes here.
+	private static Material ShaderNameToMaterial(string shaderName)
 	{
-		Texture2D texture = new Texture2D(newWidth, newHeight, TextureFormat.ARGB32, false);
-		float fNewWidth = (float)newWidth;
-		float fNewHeight = (float)newHeight;
-
-		for (int y = 0; y < newWidth; ++y)
+		Material mat = new Material(Shader.Find("Custom/FAUnitShader"));
+		if (shaderName == "Seraphim")
 		{
-			float fY = (float)y;
-			for (int x = 0; x < newHeight; ++x)
-			{
-				float fX = (float)x;
-				float fPixelX = fX / fNewWidth;
-				float fPixelY = fY / fNewHeight;
-
-				float hCenter = bumpMap.GetPixelBilinear(fPixelX, fPixelY).grayscale;
-				float hUp = bumpMap.GetPixelBilinear(fPixelX, (fY - 1.0f) / fNewHeight).grayscale;
-				float hRight = bumpMap.GetPixelBilinear((fX + 1.0f) / fNewWidth, fPixelY).grayscale;
-
-				float dY = Mathf.Abs(hCenter - hUp);
-				float dX = Mathf.Abs(hCenter - hRight);
-
-				float length = Mathf.Sqrt(dY * dY + dX * dX + 1);
-				float invLength = 1.0f / length;
-
-				float red = dX * invLength;
-				float green = 1.0f - dY * invLength;
-				float blue = (invLength + 1.0f) * 0.5f;
-				float alpha = 1.0f;
-
-				/*Color pixel = bumpMap.GetPixelBilinear(fX / fNewWidth, fY / fNewHeight);
-				float red = pixel.a;
-				float green = 1.0f - pixel.g;
-				float blue =  1.0f;
-				float alpha = 1.0f;*/
-
-				texture.SetPixel(x, y, new Color(red, green, blue, alpha));
-			}
+			mat.EnableKeyword("TEAMCOLOR_ALBEDO");
 		}
-
-		texture.Apply();
-		return texture;
+		return mat;
 	}
 }

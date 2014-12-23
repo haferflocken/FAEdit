@@ -1,12 +1,12 @@
 ﻿<Properties>
-  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" PreferredExecutionTarget="MonoDevelop.Default" />
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />
   <MonoDevelop.Ide.Workbench ActiveDocument="Assets\shaders\FAUnitShader.shader">
     <Files>
-      <File FileName="Assets\shaders\FAUnitShader.shader" Line="33" Column="59" />
+      <File FileName="Assets\shaders\FAUnitShader.shader" Line="1" Column="1" />
       <File FileName="Assets\scripts\BPImporter.cs" Line="1" Column="1" />
       <File FileName="Assets\scripts\FAUnitComponent.cs" Line="1" Column="1" />
       <File FileName="Assets\scripts\DDSImporter.cs" Line="1" Column="1" />
-      <File FileName="Assets\scripts\SCMImporter.cs" Line="7" Column="46" />
+      <File FileName="Assets\scripts\SCMImporter.cs" Line="1" Column="1" />
     </Files>
   </MonoDevelop.Ide.Workbench>
   <MonoDevelop.Ide.DebuggingService.Breakpoints>

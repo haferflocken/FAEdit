@@ -8,12 +8,6 @@ using System.Text;
 
 public class SCMImporter
 {
-	/*
-	 * SCM Format:
-	 * 120 byte header
-	 * 8 bytes of ???
-	 * Bone names until the bone spatial data
-	 */
 	public static void Load(GameObject gameObject, FileInfo scmFile)
 	{
 		SkinnedMeshRenderer meshRenderer = gameObject.GetComponent<SkinnedMeshRenderer>();
@@ -23,29 +17,23 @@ public class SCMImporter
 			SCMHeader header = new SCMHeader();
 			header.Load(reader);
 
-			// What the fuck is this? I do not understand the corresponding Python.
-			int headerSize = 120;
-			//reader.ReadBytes(Pad(headerSize));
-			//int numBoneNamesBytes = (header.BoneOffset - 4) - headerSize + Pad(headerSize);
-
-			reader.BaseStream.Seek(Pad(headerSize), SeekOrigin.Current); // This goes forward by 8 bytes. What are those 8 bytes?
-			int numBoneNamesBytes = (int)(header.BoneOffset - 4) - (int)(reader.BaseStream.Position);
-
-			// Read in the bone names.
-			string rawBoneNames = new string(reader.ReadChars(numBoneNamesBytes));
-			string[] boneNames = rawBoneNames.Split("\0".ToCharArray());
-
 			// Read in the bones.
 			reader.BaseStream.Seek(header.BoneOffset, SeekOrigin.Begin);
 			SCMBone[] bones = new SCMBone[header.TotalBoneCount];
 			for (int i = 0; i < bones.Length; ++i)
 			{
-				bones[i] = new SCMBone(boneNames[i]);
+				bones[i] = new SCMBone();
 				bones[i].Load(reader);
+			}
+
+			foreach (SCMBone bone in bones)
+			{
+				bone.LoadName(reader);
 			}
 
 			// Set parent bones.
 			// TODO this potentially does not traverse the bones in the correct order (it's a tree, after all). That should be figured out.
+			//		The potential problem is a failure to properly set the bone transforms.
 			foreach (SCMBone bone in bones)
 			{
 				if (bone.ParentIndex != -1)
@@ -64,7 +52,7 @@ public class SCMImporter
 			Vector2[] uv1 = new Vector2[header.VertexCount];
 			Vector2[] uv2 = new Vector2[header.VertexCount];
 			BoneWeight[] weights = new BoneWeight[header.VertexCount];
-			for (int i = 0; i < header.VertexCount; ++i)
+			for (uint i = 0; i < header.VertexCount; ++i)
 			{
 				reader.ReadVector(out vertexes[i]);
 				tangents[i].x = reader.ReadSingle();
@@ -72,13 +60,9 @@ public class SCMImporter
 				tangents[i].z = reader.ReadSingle();
 				tangents[i].w = 1f;
 				reader.ReadVector(out normals[i]);
-				reader.ReadVector(out binormals[i]); // TODO Unity calculates its own binormals. Don't bother reading them.
+				reader.ReadVector(out binormals[i]);
 				reader.ReadVector(out uv1[i]);
 				reader.ReadVector(out uv2[i]);
-
-				// Correct flipped y coordinates in the UVs.
-				//uv1[i].y = 1.0f - uv1[i].y;
-				//uv2[i].y = 1.0f - uv2[i].y;
 
 				int boneIndex = (int)reader.ReadUInt32();
 				weights[i].boneIndex0 = boneIndex;
@@ -93,7 +77,10 @@ public class SCMImporter
 				triangles[i] = reader.ReadInt16();
 			}
 
-			// TODO(maybe) Read info.
+			// Output the info.
+			reader.BaseStream.Seek(header.InfoOffset, SeekOrigin.Begin);
+			string info = new string(reader.ReadChars((int)header.InfoCount));
+			Debug.Log(scmFile.Name + " info: " + info);
 
 			// Assign all this data to the mesh.
 			Mesh mesh = new Mesh();
@@ -147,7 +134,6 @@ public class SCMImporter
 			meshRenderer.bones = boneTransforms;
 			meshRenderer.rootBone = rootBone;
 			meshRenderer.sharedMesh = mesh;
-
 		}
 	}
 
@@ -188,7 +174,7 @@ public class SCMHeader
 		BoneOffset = reader.ReadUInt32();
 		BoneCount = reader.ReadUInt32();
 		VertexOffset = reader.ReadUInt32();
-		ExtraVertexOffset = reader.ReadUInt32();
+		ExtraVertexOffset = reader.ReadUInt32(); // This will always be 0 according to the header doc.
 		VertexCount = reader.ReadUInt32();
 		IndexOffset = reader.ReadUInt32();
 		IndexCount = reader.ReadUInt32();
@@ -196,6 +182,16 @@ public class SCMHeader
 		InfoOffset = reader.ReadUInt32();
 		InfoCount = reader.ReadUInt32();
 		TotalBoneCount = reader.ReadUInt32();
+
+		if (!IsValid())
+		{
+			Debug.LogWarning("SCM header failed validation.");
+		}
+	}
+
+	public bool IsValid()
+	{
+		return Marker == "MODL" && ExtraVertexOffset == 0;
 	}
 }
 
@@ -205,14 +201,16 @@ public class SCMBone
 	public Matrix4x4 TransformMatrix { get; set; } // Transform of the bone relative to the local origin of the mesh.
 	public Vector3 Position { get; private set; } // Position relative to the parent bone.
 	public Quaternion Rotation { get; private set; } // Rotation relative to the parent bone.
+	public int NameOffset { get; private set; }
 	public int ParentIndex { get; private set; }
 
-	public SCMBone(string name)
+	public SCMBone()
 	{
-		Name = name;
+		Name = null;
 		TransformMatrix = Matrix4x4.zero;
 		Position = Vector3.zero;
 		Rotation = Quaternion.identity;
+		NameOffset = -1;
 		ParentIndex = -1;
 	}
 
@@ -230,19 +228,35 @@ public class SCMBone
 		}
 		TransformMatrix = TransformMatrix.inverse;
 
-		// Read the position.
 		Vector3 newPos;
 		reader.ReadVector(out newPos);
 		Position = newPos;
 
-		// Read the rotation.
-		Rotation.Set(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+		Quaternion newRot;
+		reader.ReadQuaternion(out newRot);
+		Rotation = newRot;
 
-		// Read the parent index.
-		reader.ReadInt32();
+		NameOffset = reader.ReadInt32();
 		ParentIndex = reader.ReadInt32();
-		reader.ReadInt32();
-		reader.ReadInt32();
+		reader.ReadInt32(); // Broken value: mFirstVertIndex
+		reader.ReadInt32(); // Broken value: mNumVerts
+	}
+
+	public void LoadName(BinaryReader reader)
+	{
+		if (NameOffset == -1)
+		{
+			Debug.LogWarning("Name offset must be set before calling LoadName.");
+			return;
+		}
+
+		reader.BaseStream.Seek(NameOffset, SeekOrigin.Begin);
+		StringBuilder buffer = new StringBuilder();
+		while (reader.PeekChar() != '\0')
+		{
+			buffer.Append(reader.ReadChar());
+		}
+		Name = buffer.ToString();
 	}
 }
 
@@ -261,5 +275,22 @@ public static class BinaryReaderExtensions
 		vector.z = reader.ReadSingle();
 	}
 	
+	public static void ReadQuaternion(this BinaryReader reader, out Quaternion quaternion)
+	{
+		quaternion.x = reader.ReadSingle();
+		quaternion.y = reader.ReadSingle();
+		quaternion.z = reader.ReadSingle();
+		quaternion.w = reader.ReadSingle();
+	}
+
+	public static string ReadNullTerminatedString(this BinaryReader reader)
+	{
+		StringBuilder buffer = new StringBuilder();
+		while (reader.PeekChar() != '\0')
+		{
+			buffer.Append(reader.ReadChar());
+		}
+		return buffer.ToString();
+	}
 }
 
