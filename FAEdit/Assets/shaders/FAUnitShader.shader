@@ -36,17 +36,8 @@
 			INTERNAL_DATA
 		};
 
-		void surf(Input IN, inout SurfaceOutput o)
+		half3 HeightToNormal(Input IN)
 		{
-			half4 mainTex = tex2D(_MainTex, IN.uv_MainTex);
-			half4 specTeam = tex2D(_SpecTeam, IN.uv_MainTex);
-			
-			#ifdef TEAMCOLOR_ALBEDO
-				o.Albedo = lerp(mainTex.rgb, _TeamColor, mainTex.a);
-			#elif TEAMCOLOR_SPECTEAM
-				o.Albedo = lerp(mainTex.rgb, _TeamColor, specTeam.a);
-			#endif
-
 			float bumpPixelX = IN.uv2_BumpMap.x * _BumpWidth;
 			float bumpPixelY = IN.uv2_BumpMap.y * _BumpHeight;
 			
@@ -62,7 +53,21 @@
 			half length = sqrt(dY * dY + dX * dX + 1);
 			half invLength = 1 / length;
 
-			o.Normal = half3(dX * invLength, 1 - dY * invLength, (invLength + 1) * 0.5);
+			return half3(dX * invLength, 1 - dY * invLength, (invLength + 1) * 0.5);
+		}
+
+		void surf(Input IN, inout SurfaceOutput o)
+		{
+			half4 mainTex = tex2D(_MainTex, IN.uv_MainTex);
+			half4 specTeam = tex2D(_SpecTeam, IN.uv_MainTex);
+			
+			#ifdef TEAMCOLOR_ALBEDO
+				o.Albedo = lerp(mainTex.rgb, _TeamColor, mainTex.a);
+			#elif TEAMCOLOR_SPECTEAM
+				o.Albedo = lerp(mainTex.rgb, _TeamColor, specTeam.a);
+			#endif
+
+			o.Normal = HeightToNormal(IN);
 
 			half4 cubeMap = texCUBE(_Cube, WorldReflectionVector(IN, o.Normal));
 

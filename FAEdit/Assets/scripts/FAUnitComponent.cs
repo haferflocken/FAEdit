@@ -52,13 +52,13 @@ public class FAUnitComponent : MonoBehaviour
 		LuaValue scaleVal = _blueprint.Get("Display.UniformScale");
 		float scale = (scaleVal == null || scaleVal.LVT != LuaValueType.LVT_Float) ? 1.0f : scaleVal.FloatValue;
 		transform.root.localScale = new Vector3(scale, scale, scale);
-		yield return new WaitForSeconds(5f);
+		yield return null;
 
 		// Iteratively load the DDS files.
 		for (DDSImporter.LoadStages i = DDSImporter.LoadStages.Init; i < DDSImporter.LoadStages.Count; ++i)
 		{
 			bool success = DDSImporter.LoadStage(i, gameObject, lod0);
-			yield return new WaitForSeconds(5f);
+			yield return null;
 
 			if (!success)
 			{
@@ -72,6 +72,13 @@ public class FAUnitComponent : MonoBehaviour
 		{
 			SCAImporter.Load(gameObject, scaFile);
 			yield return null;
+		}
+		Animation animComponent = gameObject.GetComponentInParent<Animation>();
+		if (animComponent.GetClipCount() > 0)
+		{
+			Debug.Log("Playing animation " + scaFiles[0].Name);
+			animComponent.clip = animComponent.GetClip(scaFiles[0].Name);
+			animComponent.Play(scaFiles[0].Name);
 		}
 	}
 

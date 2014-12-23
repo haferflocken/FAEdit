@@ -34,6 +34,7 @@ public class SCMImporter
 			// Set parent bones.
 			// TODO this potentially does not traverse the bones in the correct order (it's a tree, after all). That should be figured out.
 			//		The potential problem is a failure to properly set the bone transforms.
+			//		That said this transform isn't used for anything so... whatever.
 			foreach (SCMBone bone in bones)
 			{
 				if (bone.ParentIndex != -1)
@@ -90,7 +91,7 @@ public class SCMImporter
 			mesh.uv2 = uv2;
 			mesh.triangles = triangles;
 			//mesh.normals = normals;  // TODO Something is wrong with the normals that are read in.
-			mesh.RecalculateNormals(); // The calculated normals are really good. Once a real normal map is applied I'll know if they're perfect.
+			mesh.RecalculateNormals(); // The calculated normals are really good.
 			mesh.tangents = tangents;
 			mesh.boneWeights = weights;
 
@@ -101,8 +102,9 @@ public class SCMImporter
 			for (int i = 0; i < bones.Length; ++i)
 			{
 				SCMBone bone = bones[i];
-
 				boneTransforms[i] = new GameObject(bone.Name).transform;
+				boneTransforms[i].gameObject.tag = "debug_bone";
+
 				if (bone.ParentIndex != -1)
 				{
 					boneTransforms[i].parent = boneTransforms[bone.ParentIndex];
@@ -130,6 +132,7 @@ public class SCMImporter
 
 				bindPoses[i] = boneTransforms[i].worldToLocalMatrix * gameObject.transform.localToWorldMatrix;
 			}
+
 			mesh.bindposes = bindPoses;
 			meshRenderer.bones = boneTransforms;
 			meshRenderer.rootBone = rootBone;
@@ -217,7 +220,6 @@ public class SCMBone
 	public void Load(BinaryReader reader)
 	{
 		// Read the transform.
-		// TODO This transform never ends up getting used, so I'm not sure how correct it is. A use should be found for it.
 		for (int row = 0; row < 4; ++row)
 		{
 			for (int col = 0; col < 4; ++col)
@@ -251,46 +253,6 @@ public class SCMBone
 		}
 
 		reader.BaseStream.Seek(NameOffset, SeekOrigin.Begin);
-		StringBuilder buffer = new StringBuilder();
-		while (reader.PeekChar() != '\0')
-		{
-			buffer.Append(reader.ReadChar());
-		}
-		Name = buffer.ToString();
+		Name = reader.ReadNullTerminatedString();
 	}
 }
-
-public static class BinaryReaderExtensions
-{
-	public static void ReadVector(this BinaryReader reader, out Vector2 vector)
-	{
-		vector.x = reader.ReadSingle();
-		vector.y = reader.ReadSingle();
-	}
-
-	public static void ReadVector(this BinaryReader reader, out Vector3 vector)
-	{
-		vector.x = reader.ReadSingle();
-		vector.y = reader.ReadSingle();
-		vector.z = reader.ReadSingle();
-	}
-	
-	public static void ReadQuaternion(this BinaryReader reader, out Quaternion quaternion)
-	{
-		quaternion.x = reader.ReadSingle();
-		quaternion.y = reader.ReadSingle();
-		quaternion.z = reader.ReadSingle();
-		quaternion.w = reader.ReadSingle();
-	}
-
-	public static string ReadNullTerminatedString(this BinaryReader reader)
-	{
-		StringBuilder buffer = new StringBuilder();
-		while (reader.PeekChar() != '\0')
-		{
-			buffer.Append(reader.ReadChar());
-		}
-		return buffer.ToString();
-	}
-}
-

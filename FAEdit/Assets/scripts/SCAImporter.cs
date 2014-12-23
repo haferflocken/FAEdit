@@ -44,7 +44,72 @@ public class SCAImporter
 				keyFrames[i].Load(reader, header);
 			}
 
-			// TODO(jwerner) Apply this to the Unity animation.
+			// Create an animation curve for the position and rotation of each bone (7 properties).
+			AnimationClip clip = new AnimationClip();
+
+			for (int i = 0; i < bones.Length; ++i)
+			{
+				AnimationCurve posXCurve = new AnimationCurve();
+				AnimationCurve posYCurve = new AnimationCurve();
+				AnimationCurve posZCurve = new AnimationCurve();
+				AnimationCurve rotXCurve = new AnimationCurve();
+				AnimationCurve rotYCurve = new AnimationCurve();
+				AnimationCurve rotZCurve = new AnimationCurve();
+				AnimationCurve rotWCurve = new AnimationCurve();
+
+				for (int j = 0; j < keyFrames.Length; ++j)
+				{
+					float time = keyFrames[j].Time;
+
+					Vector3 pos = keyFrames[j].BonePositions[i];
+					posXCurve.AddKey(time, pos.x);
+					posYCurve.AddKey(time, pos.y);
+					posZCurve.AddKey(time, pos.z);
+
+					Quaternion rot = keyFrames[j].BoneOrientations[i];
+					rotXCurve.AddKey(time, rot.x);
+					rotYCurve.AddKey(time, rot.y);
+					rotZCurve.AddKey(time, rot.z);
+					rotWCurve.AddKey(time, rot.w);
+				}
+
+				StringBuilder bonePathBuffer = new StringBuilder();
+				SCABone curBone = bones[i];
+				while (curBone != null)
+				{
+					bonePathBuffer.Insert(0, curBone.Name + "/");
+
+					if (curBone.ParentIndex != -1)
+					{
+						curBone = bones[curBone.ParentIndex];
+					}
+					else
+					{
+						curBone = null;
+					}
+				}
+				if (bonePathBuffer.Length > 0)
+				{
+					bonePathBuffer.Remove(bonePathBuffer.Length - 1, 1);
+				}
+				string bonePath = bonePathBuffer.ToString();
+				Debug.Log(bonePath);
+
+				clip.SetCurve(bonePath, typeof(Transform), "localPosition.x", posXCurve);
+				clip.SetCurve(bonePath, typeof(Transform), "localPosition.y", posYCurve);
+				clip.SetCurve(bonePath, typeof(Transform), "localPosition.z", posZCurve);
+				clip.SetCurve(bonePath, typeof(Transform), "localRotation.x", rotXCurve);
+				clip.SetCurve(bonePath, typeof(Transform), "localRotation.y", rotYCurve);
+				clip.SetCurve(bonePath, typeof(Transform), "localRotation.z", rotZCurve);
+				clip.SetCurve(bonePath, typeof(Transform), "localRotation.w", rotWCurve);
+			}
+
+			clip.EnsureQuaternionContinuity();
+			clip.wrapMode = WrapMode.Loop;
+
+			// Apply the clip to the animation component.
+			Animation animComponent = gameObject.GetComponentInParent<Animation>();
+			animComponent.AddClip(clip, scaFile.Name);
 		}
 	}
 }
@@ -92,7 +157,7 @@ public class SCAHeader
 public class SCABone
 {
 	public string Name { get; private set; }
-	public uint ParentIndex { get; private set; }
+	public int ParentIndex { get; private set; }
 
 	public SCABone()
 	{
@@ -105,7 +170,7 @@ public class SCABone
 
 	public void LoadParentIndex(BinaryReader reader)
 	{
-		ParentIndex = reader.ReadUInt32();
+		ParentIndex = reader.ReadInt32();
 	}
 }
 
