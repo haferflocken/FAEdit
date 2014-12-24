@@ -236,7 +236,9 @@ public class SCMBone
 
 		Quaternion newRot;
 		reader.ReadQuaternion(out newRot);
-		Rotation = newRot;
+		Vector3 eulerAngles = newRot.eulerAngles;
+		eulerAngles.x -= 180f; // Correct messed up Z rotation (z is not a typo).
+		Rotation = Quaternion.Euler(eulerAngles);
 
 		NameOffset = reader.ReadInt32();
 		ParentIndex = reader.ReadInt32();

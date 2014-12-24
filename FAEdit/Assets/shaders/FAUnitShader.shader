@@ -41,8 +41,8 @@
 			float bumpPixelX = IN.uv2_BumpMap.x * _BumpWidth;
 			float bumpPixelY = IN.uv2_BumpMap.y * _BumpHeight;
 			
-			float2 bumpRightUVs = float2((bumpPixelX + 1) / _BumpWidth, bumpPixelY);
-			float2 bumpUpUVs = float2(bumpPixelX, (bumpPixelY - 1) / _BumpHeight);
+			float2 bumpRightUVs = float2((bumpPixelX + 1) / _BumpWidth, IN.uv2_BumpMap.y);
+			float2 bumpUpUVs = float2(IN.uv2_BumpMap.x, (bumpPixelY - 1) / _BumpHeight);
 
 			half hCenter = tex2D(_BumpMap, IN.uv2_BumpMap).r;
 			half hUp = tex2D(_BumpMap, bumpUpUVs).r;
