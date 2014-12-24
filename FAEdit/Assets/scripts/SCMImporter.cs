@@ -56,10 +56,13 @@ public class SCMImporter
 			for (uint i = 0; i < header.VertexCount; ++i)
 			{
 				reader.ReadVector(out vertexes[i]);
-				tangents[i].x = reader.ReadSingle();
+				vertexes[i].x *= -1;
+
+				tangents[i].x = reader.ReadSingle() * -1;
 				tangents[i].y = reader.ReadSingle();
 				tangents[i].z = reader.ReadSingle();
 				tangents[i].w = 1f;
+
 				reader.ReadVector(out normals[i]);
 				reader.ReadVector(out binormals[i]);
 				reader.ReadVector(out uv1[i]);
@@ -77,6 +80,7 @@ public class SCMImporter
 			{
 				triangles[i] = reader.ReadInt16();
 			}
+			System.Array.Reverse(triangles);
 
 			// Output the info.
 			reader.BaseStream.Seek(header.InfoOffset, SeekOrigin.Begin);
@@ -232,6 +236,7 @@ public class SCMBone
 
 		Vector3 newPos;
 		reader.ReadVector(out newPos);
+		newPos.x *= -1;
 		Position = newPos;
 
 		Quaternion newRot;
