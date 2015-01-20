@@ -74,12 +74,12 @@ public class FAUnitComponent : MonoBehaviour
 			yield return null;
 		}
 		Animation animComponent = gameObject.GetComponentInParent<Animation>();
-		if (animComponent.GetClipCount() > 0)
+		/*if (animComponent.GetClipCount() > 0)
 		{
 			Debug.Log("Playing animation " + scaFiles[0].Name);
 			animComponent.clip = animComponent.GetClip(scaFiles[0].Name);
 			animComponent.Play(scaFiles[0].Name);
-		}
+		}*/
 	}
 
 	private LODFiles GetLODFiles(int level, IEnumerable<FileInfo> directoryFiles)

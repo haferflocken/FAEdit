@@ -43,8 +43,6 @@ public class DebugBoneComponent : MonoBehaviour
 
 		foreach (GameObject bone in allBones)
 		{
-			GL.Color(Color.red);
-
 			Transform t = bone.transform;
 			int depth = CalcDepth(t);
 

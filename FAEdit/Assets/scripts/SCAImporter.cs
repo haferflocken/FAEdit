@@ -62,11 +62,15 @@ public class SCAImporter
 					float time = keyFrames[j].Time;
 
 					Vector3 pos = keyFrames[j].BonePositions[i];
+					pos.x *= -1;
 					posXCurve.AddKey(time, pos.x);
 					posYCurve.AddKey(time, pos.y);
 					posZCurve.AddKey(time, pos.z);
 
 					Quaternion rot = keyFrames[j].BoneOrientations[i];
+					Vector3 eulerAngles = rot.eulerAngles;
+					eulerAngles.x -= 180f; // Correct about z.
+					rot = Quaternion.Euler(eulerAngles);
 					rotXCurve.AddKey(time, rot.x);
 					rotYCurve.AddKey(time, rot.y);
 					rotZCurve.AddKey(time, rot.z);
@@ -93,7 +97,6 @@ public class SCAImporter
 					bonePathBuffer.Remove(bonePathBuffer.Length - 1, 1);
 				}
 				string bonePath = bonePathBuffer.ToString();
-				Debug.Log(bonePath);
 
 				clip.SetCurve(bonePath, typeof(Transform), "localPosition.x", posXCurve);
 				clip.SetCurve(bonePath, typeof(Transform), "localPosition.y", posYCurve);

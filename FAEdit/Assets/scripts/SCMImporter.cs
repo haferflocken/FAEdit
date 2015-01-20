@@ -35,14 +35,14 @@ public class SCMImporter
 			// TODO this potentially does not traverse the bones in the correct order (it's a tree, after all). That should be figured out.
 			//		The potential problem is a failure to properly set the bone transforms.
 			//		That said this transform isn't used for anything so... whatever.
-			foreach (SCMBone bone in bones)
+			/*foreach (SCMBone bone in bones)
 			{
 				if (bone.ParentIndex != -1)
 				{
 					SCMBone parent = bones[bone.ParentIndex];
 					bone.TransformMatrix = bone.TransformMatrix * parent.TransformMatrix.inverse;
 				}
-			}
+			}*/
 
 			// Read vertex data.
 			reader.BaseStream.Seek(header.VertexOffset, SeekOrigin.Begin);
