@@ -37,6 +37,11 @@ public class FAUnitComponent : MonoBehaviour
 		_blueprint = GetComponent<BPComponent>();
 		yield return null;
 
+		// Save the BP to test the BP exporter.
+		FileInfo blueprintFileExport = new FileInfo(directoryPath + "/exportTest.bp");
+		BPExporter.Save(_blueprint, blueprintFileExport);
+		yield return null;
+
 		// Get the LOD0 files.
 		LODFiles lod0 = GetLODFiles(0, directoryFiles);
 		if (lod0.mesh == null)

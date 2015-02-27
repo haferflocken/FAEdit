@@ -129,6 +129,11 @@ public class LuaValue
 
 	public LuaValue Get(string key)
 	{
+		if (key == "")
+		{
+			return this;
+		}
+
 		switch (LVT)
 		{
 		case LuaValueType.LVT_Nil:
@@ -163,6 +168,7 @@ public class LuaValue
 			return null;
 		}
 		default:
+			Debug.LogError("Invalid LVT.");
 			return null;
 		}
 	}

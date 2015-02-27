@@ -3,7 +3,7 @@ using System.Text;
 using System.IO;
 using System.Collections.Generic;
 
-public class BPImporter
+public static class BPImporter
 {
 	private struct TableBuilder
 	{
